@@ -53,10 +53,14 @@ Serves `dist/` at http://localhost:8792. Open `/preview.html` for the single-fil
 
 To regenerate the PNG icons and link-preview image after changing `src/site/icon.svg`, build, run the dev server, open `/_tools/render_images.html` (copy `tools/render_images.html` into `dist/_tools/` first), and run `saveAll()` in the console.
 
-## Deploy the self-hosted site
+## Deploy
 
-1. Set `SITE_URL` in `build.py` to the public address (for example `https://orvy.app/`), then build. Link previews need an absolute image URL.
-2. Upload the contents of `dist/site/` to any static host: Cloudflare Pages, Netlify, GitHub Pages, or S3 with a CDN.
-3. Serve over HTTPS. The offline worker only runs on HTTPS or localhost.
+Every push to `main` runs `.github/workflows/pages.yml`, which runs the tests, builds the site and publishes `dist/site/` to GitHub Pages. To deploy somewhere else, build with the public address so link previews get an absolute image URL:
+
+```bash
+SITE_URL=https://example.com/ python3 build.py
+```
+
+Then upload the contents of `dist/site/` to any static host over HTTPS. The offline worker only runs on HTTPS or localhost.
 
 Share links are built from the page's own address, so they work on whatever domain hosts the site.

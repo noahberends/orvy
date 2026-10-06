@@ -12,6 +12,7 @@ Minifies with rjsmin and rcssmin when installed (pip install -r requirements-dev
 import base64
 import hashlib
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -23,8 +24,10 @@ NAME = "Orvy"
 DESCRIPTION = "A step sequencer driven by Conway's Game of Life. Light cells to write a melody and let the grid evolve it."
 # Where the single-file page is hosted. Share links from that build point here.
 EMBED_URL = "https://claude.ai/artifact/3Lya3jKtzZxn6G8JVytV1A"
-# Set this to the public address once the site has a home, e.g. "https://orvy.app/". Used for link previews.
-SITE_URL = ""
+# The site's public address, ending in "/". Used for link previews. The deploy workflow sets it.
+SITE_URL = os.environ.get("SITE_URL", "")
+if SITE_URL and not SITE_URL.endswith("/"):
+    SITE_URL += "/"
 THEME = "#0a0614"
 FONTS = [
     ("Chakra Petch", 400, "chakra-petch-400.woff2"),
