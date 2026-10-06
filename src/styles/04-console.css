@@ -31,3 +31,5 @@ details.section > summary:hover .label { color: var(--fg); }
 .field { display: grid; gap: 6px; }
 .flabel { font-size: 12px; color: var(--muted); }
 .sheet-head { display: none; }
+.dragrow .field { min-width: 0; }
+.dragrow select { padding-block: 7px; }

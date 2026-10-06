@@ -7,7 +7,7 @@ A step sequencer driven by Conway's Game of Life. Lit cells play their row's not
 | Path | What it is |
 |---|---|
 | `src/index.html` | Page markup (template with `{{NAME}}`, `{{HEAD}}`, `{{STYLES}}`, `{{SCRIPT}}`) |
-| `src/core.js` | Pure logic: Life rule, link codes, grid resizing, settings validation. No DOM or audio |
+| `src/core.js` | Pure logic: Life rule, link codes, grid resizing, settings validation, starter patterns, MIDI export. No DOM or audio |
 | `src/app.js` | Everything else: audio, drawing, history, input, tapes |
 | `src/styles/` | Stylesheets, one per component, concatenated in file-name order |
 | `src/fonts/` | Self-hosted fonts (Chakra Petch, Tilt Neon) and their SIL Open Font Licenses |
@@ -55,7 +55,16 @@ To regenerate the PNG icons and link-preview image after changing `src/site/icon
 
 ## Deploy
 
-Every push to `main` runs `.github/workflows/pages.yml`, which runs the tests, builds the site and publishes `dist/site/` to GitHub Pages. To deploy somewhere else, build with the public address so link previews get an absolute image URL:
+Every push to `main` runs `.github/workflows/pages.yml`, which runs the tests, builds the site and publishes `dist/site/` to GitHub Pages. Pull requests run the tests and build without deploying. Dependabot proposes updates to the workflow's actions weekly.
+
+Optional features turn on when these repository variables are set (Settings > Secrets and variables > Actions > Variables):
+
+| Variable | Effect |
+|---|---|
+| `GOATCOUNTER` | Privacy-friendly visit counts through GoatCounter, e.g. `orvy` for orvy.goatcounter.com |
+| `CONTACT` | An email address or URL, shown as a feedback link in the help page |
+| `ERROR_ENDPOINT` | A URL that receives uncaught errors from the site as small JSON posts |
+ To deploy somewhere else, build with the public address so link previews get an absolute image URL:
 
 ```bash
 SITE_URL=https://example.com/ python3 build.py

@@ -81,9 +81,15 @@
             <button type="button" data-stamp="toad" aria-pressed="false" aria-label="Toad stamp" title="Toad"><canvas></canvas></button>
             <button type="button" data-stamp="beacon" aria-pressed="false" aria-label="Beacon stamp" title="Beacon"><canvas></canvas></button>
           </div>
-          <div class="strip" role="group" aria-label="Start over">
+          <span class="flabel" id="startLabel">Start over with</span>
+          <div class="strip" role="group" aria-labelledby="startLabel">
+            <button type="button" data-seed="pulse" title="Four blinkers: a melody, then chords, forever">Pulse</button>
+            <button type="button" data-seed="canon" title="Two gliders and a toad that meet and settle">Canon</button>
+            <button type="button" data-seed="chaos" title="An R-pentomino that grows for a long time">Chaos</button>
+            <button type="button" data-seed="drift" title="A spaceship drifting past a toad">Drift</button>
+          </div>
+          <div class="strip" role="group" aria-label="Replace the grid">
             <button type="button" data-seed="gliders">Gliders</button>
-            <button type="button" data-seed="osc">Oscillators</button>
             <button type="button" data-seed="random">Random</button>
             <button type="button" data-seed="clear" class="danger">Clear</button>
           </div>
@@ -105,7 +111,31 @@
             <option value="reed">Reed</option>
             <option value="pluck">Pluck</option>
           </select>
+          <div class="dragrow">
+            <div class="field">
+              <label class="flabel" for="key">Key</label>
+              <select id="key">
+                <option value="0">C</option><option value="1">C#</option><option value="2">D</option><option value="3">D#</option>
+                <option value="4">E</option><option value="5">F</option><option value="6">F#</option><option value="7">G</option>
+                <option value="8">G#</option><option value="9">A</option><option value="10">A#</option><option value="11">B</option>
+              </select>
+            </div>
+            <div class="field">
+              <span class="flabel" id="swingLabel">Swing</span>
+              <div class="dragnum" title="Delays every second step. Drag sideways or type a number.">
+                <input id="swing" type="text" inputmode="numeric" role="spinbutton" aria-labelledby="swingLabel" autocomplete="off">
+                <span class="unit">%</span>
+              </div>
+            </div>
+          </div>
           <label class="check" title="Plays an octave below the lowest lit cell, once per bar"><input type="checkbox" id="bass"> Bass</label>
+          <div class="field">
+            <span class="flabel" id="engineLabel">Engine</span>
+            <div class="strip" role="group" aria-labelledby="engineLabel" id="engine">
+              <button type="button" data-v="studio" title="Room reverb, fuller voices and a limiter">Studio</button>
+              <button type="button" data-v="classic" title="The original sound: plain voices and an echo">Classic</button>
+            </div>
+          </div>
         </div>
       </details>
 
@@ -165,11 +195,22 @@
           <button class="btn" type="button" id="record" hidden>
             <svg class="i" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><circle class="recDot" cx="10" cy="10" r="3.2"/></svg><span id="recordLabel">Record audio</span>
           </button>
+          <button class="btn" type="button" id="midi" hidden title="The next eight bars as a MIDI file, for GarageBand, Logic, Ableton and others">
+            <svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 15.5V4.5l9-2v11"/><circle cx="5" cy="15.5" r="2"/><circle cx="14" cy="13.5" r="2"/></svg>Export MIDI
+          </button>
           <div class="tapes" id="tapes"></div>
         </div>
       </details>
     </aside>
   </div>
+
+  <!-- @site-only -->
+  <section class="about" aria-labelledby="aboutTitle">
+    <h2 id="aboutTitle">A step sequencer driven by the Game of Life</h2>
+    <p>Draw cells on the grid and press Play. Each lit cell plays its row's note when the playhead reaches it, and at the end of every bar the grid moves forward one generation under Conway's rules. Gliders travel across the grid, blinkers alternate between a run of notes and a chord, and some patterns grow for a while before settling, so the melody keeps changing on its own.</p>
+    <p>{{NAME}} runs in your browser with nothing to install and works offline after your first visit. Your work stays on your device. You can share a pattern as a link, record it as audio, or export it as MIDI for your music software.</p>
+  </section>
+  <!-- @end-site-only -->
 </div>
 
 <div class="scrim" id="scrim" hidden></div>
@@ -199,6 +240,17 @@
       <li>A cell that will go out next generation flickers during playback and plays a short note.</li>
       <li>Each step plays up to four notes, newest cells first.</li>
       <li>With Bass on, a low note plays an octave below the lowest lit cell at the start of each bar.</li>
+      <li>Key moves every row up or down together. Swing delays every second step for a looser groove.</li>
+      <li>The Studio engine adds a room reverb and fuller voices. Classic is the original, drier sound.</li>
+    </ul>
+
+    <h3>Saving and sharing</h3>
+    <ul>
+      <li>Tapes keep up to four patterns on this device, with their sound settings.</li>
+      <li>Copy link puts the pattern and its sound into a link anyone can open.</li>
+      <!-- @site-only -->
+      <li>Record audio saves what you hear as a sound file. Export MIDI saves the next eight bars as a MIDI file for your music software.</li>
+      <!-- @end-site-only -->
     </ul>
 
     <h3>Drawing</h3>
@@ -223,8 +275,11 @@
     <h3>The rules</h3>
     <p>A dark cell with exactly three lit neighbours lights up. A lit cell with two or three lit neighbours stays lit. Every other cell goes dark. This is the rule known as B3/S23. The grid wraps at its edges, so a pattern leaving the right side comes back on the left.</p>
 
-    <h3>Version 1.4</h3>
+    {{CONTACT_LINE}}
+
+    <h3>Version 1.5</h3>
     <dl class="changes">
+      <dt>1.5</dt><dd>Room reverb and fuller voices, key and swing, MIDI export, four starter patterns, and the first-visit sounds now come with their own pattern.</dd>
       <dt>1.4</dt><dd>New name, drag-to-set tempo and volume, grid length of 12, 16 or 24 steps, tapes for saving, a starting sound picker and this help page.</dd>
       <dt>1.3</dt><dd>Touch painting, resume from pause, the edit hold, stamps, undo after anything that replaces the grid.</dd>
       <dt>1.2</dt><dd>History and undo, dynamics based on cell age, bass, links to patterns, faster drawing, phone layout and keyboard control.</dd>

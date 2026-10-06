@@ -4,14 +4,14 @@
   const { ROWS, STEP_OPTIONS } = OrvyCore;
   let COLS = 16, N = COLS * ROWS;
 
+  // First-visit sounds, each with a starter pattern that suits it.
   const MOODS = {
-    bright: { scale: "majpent", voice: "glass", bpm: 96 },
-    mellow: { scale: "dorian", voice: "reed", bpm: 84 },
-    sharp: { scale: "hirajoshi", voice: "pluck", bpm: 108 },
-    hazy: { scale: "whole", voice: "glass", bpm: 72 },
+    bright: { sound: { scale: "majpent", voice: "glass", bpm: 96, key: 0, swing: 0 }, scene: "pulse" },
+    mellow: { sound: { scale: "dorian", voice: "reed", bpm: 84, key: 2, swing: 20 }, scene: "canon" },
+    sharp: { sound: { scale: "hirajoshi", voice: "pluck", bpm: 108, key: 4, swing: 0 }, scene: "chaos" },
+    hazy: { sound: { scale: "whole", voice: "glass", bpm: 72, key: 7, swing: 10 }, scene: "drift" },
   };
   const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-  const MAX_VOICES = 4;
   const MAX_HISTORY = 300;
   // Filled in by build.py: "embed" for the single-file page, "site" for self-hosting.
   const TARGET = "{{TARGET}}";
@@ -93,7 +93,7 @@
   }
 
   // ---------- History ----------
-  const SOUND_KEYS = ["bpm", "scale", "voice", "evolveEvery", "bass"];
+  const SOUND_KEYS = ["bpm", "scale", "voice", "evolveEvery", "bass", "key", "swing"];
   function snapshot(label) {
     const sound = {};
     SOUND_KEYS.forEach(k => { sound[k] = settings[k]; });
@@ -186,11 +186,7 @@
   }
 
   // ---------- Patterns ----------
-  const SCENES = {
-    gliders: [[".O.", "..O", "OOO", 1, 1], ["OOO", "O..", ".O.", 9, 6]],
-    osc: [[".OOO", "OOO.", 1, 2], ["OO..", "OO..", "..OO", "..OO", 7, 1], ["OOO", 12, 8], ["O", "O", "O", 3, 7]],
-  };
-  const SCENE_TOASTS = { gliders: "Gliders", osc: "Oscillators", random: "Random grid", clear: "Cleared" };
+  const SCENE_TOASTS = { gliders: "Gliders", osc: "Oscillators", pulse: "Pulse", canon: "Canon", chaos: "Chaos", drift: "Drift", random: "Random grid", clear: "Cleared" };
   const STAMPS = {
     glider: { name: "glider", rows: [".O.", "..O", "OOO"] },
     lwss: { name: "spaceship", rows: [".O..O", "O....", "O...O", "OOOO."] },
@@ -201,16 +197,11 @@
   };
   function seed(name, opts = {}) {
     const before = history[cursor];
-    const next = new Uint8Array(N);
+    let next = new Uint8Array(N);
     if (name === "random") {
       for (let i = 0; i < N; i++) next[i] = Math.random() < 0.3 ? 1 : 0;
-    } else if (SCENES[name]) {
-      SCENES[name].forEach(spec => {
-        const r0 = spec[spec.length - 1], c0 = spec[spec.length - 2];
-        spec.slice(0, -2).forEach((line, r) => [...line].forEach((ch, c) => {
-          if (ch === "O") next[idx((c0 + c) % COLS, (r0 + r) % ROWS)] = 1;
-        }));
-      });
+    } else if (OrvyCore.SCENES[name]) {
+      next = OrvyCore.sceneGrid(name, COLS);
     }
     replaceGrid(next);
     generation = 0;
@@ -287,7 +278,9 @@
   }
 
   // ---------- Audio ----------
-  let actx = null, master, comp, delay, delayFb, delayTone, wet;
+  // Signal path: voices -> master -> dry, echo and room reverb -> bus -> limiter -> soft clipper -> speakers.
+  // "studio" adds the room and keeps a light echo. "classic" is the original echo-only sound, kept for comparison.
+  let actx = null, master, bus, limiter, clipper, delay, delayFb, delayTone, echoWet, room, roomWet, softClipCurve;
   const AudioCtor = window.AudioContext || window.webkitAudioContext;
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   let silentAudio = null;
@@ -317,19 +310,53 @@
     // A phone call or another app can interrupt audio; pick up again when the page is back in front.
     actx.onstatechange = () => { if (playing && actx.state !== "running" && !document.hidden) actx.resume().catch(() => {}); };
     master = actx.createGain();
-    comp = actx.createDynamicsCompressor();
-    comp.threshold.value = -18; comp.ratio.value = 4;
+    bus = actx.createGain();
+    limiter = actx.createDynamicsCompressor();
+    clipper = actx.createWaveShaper(); clipper.oversample = "2x";
+    softClipCurve = new Float32Array(2048).map((_, i) => { const x = i / 2047 * 2 - 1; return Math.tanh(1.4 * x) / Math.tanh(1.4); });
     delay = actx.createDelay(2);
     delayFb = actx.createGain(); delayFb.gain.value = 0.33;
     delayTone = actx.createBiquadFilter(); delayTone.type = "lowpass"; delayTone.frequency.value = 2200;
-    wet = actx.createGain(); wet.gain.value = 0.28;
-    master.connect(comp);
-    master.connect(delay);
-    delay.connect(delayTone); delayTone.connect(delayFb); delayFb.connect(delay);
-    delayTone.connect(wet); wet.connect(comp);
-    comp.connect(actx.destination);
+    echoWet = actx.createGain();
+    room = actx.createConvolver(); room.buffer = makeRoomImpulse(2.6);
+    roomWet = actx.createGain();
+    master.connect(bus);
+    master.connect(delay); delay.connect(delayTone); delayTone.connect(delayFb); delayFb.connect(delay);
+    delayTone.connect(echoWet); echoWet.connect(bus);
+    master.connect(room); room.connect(roomWet); roomWet.connect(bus);
+    bus.connect(limiter); limiter.connect(clipper); clipper.connect(actx.destination);
+    applyEngine();
     applyAudioSettings();
     return true;
+  }
+  // Room reverb: decaying stereo noise that darkens as it fades, after a few early reflections.
+  function makeRoomImpulse(seconds) {
+    const rate = actx.sampleRate, len = Math.floor(rate * seconds);
+    const buf = actx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let smooth = 0;
+      for (let i = 0; i < len; i++) {
+        const left = 1 - i / len;
+        smooth += (0.3 + 0.6 * left) * ((Math.random() * 2 - 1) - smooth);
+        d[i] = smooth * Math.pow(left, 2.2) * Math.exp(-1.6 * i / rate);
+      }
+      [0.011, 0.019, 0.027, 0.037].forEach((t, n) => { d[Math.floor((t + ch * 0.003) * rate)] += (0.5 - n * 0.09) * (ch ? -1 : 1); });
+    }
+    return buf;
+  }
+  function applyEngine() {
+    if (!actx) return;
+    const studio = settings.engine === "studio", t = actx.currentTime;
+    echoWet.gain.setTargetAtTime(studio ? 0.1 : 0.28, t, 0.05);
+    roomWet.gain.setTargetAtTime(studio ? 0.42 : 0, t, 0.05);
+    // Studio: a fast limiter catches peaks before the soft clipper. Classic: the original gentle compressor.
+    limiter.threshold.value = studio ? -9 : -18;
+    limiter.knee.value = studio ? 2 : 30;
+    limiter.ratio.value = studio ? 16 : 4;
+    limiter.attack.value = studio ? 0.002 : 0.003;
+    limiter.release.value = studio ? 0.12 : 0.25;
+    clipper.curve = studio ? softClipCurve : null;
   }
   const resumeIfInterrupted = () => { if (playing && actx && actx.state !== "running") actx.resume().catch(() => {}); };
   document.addEventListener("visibilitychange", () => { if (!document.hidden) resumeIfInterrupted(); });
@@ -341,13 +368,15 @@
   }
   const stepDur = () => 60 / settings.bpm / 4;
 
-  const midiForRow = r => OrvyCore.midiForRow(r, settings.scale);
+  const midiForRow = r => OrvyCore.midiForRow(r, settings.scale, settings.key);
+  const swingDelay = s => s % 2 ? stepDur() * settings.swing / 100 * 0.5 : 0;
   const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
   const noteName = m => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
   const panFor = s => (s / (COLS - 1)) * 1.4 - 0.7;
 
   // bright (0..1) opens the tone filter; decayMul < 1 shortens the note.
   function playNote(freq, t, pan, level, bright = 0.7, decayMul = 1) {
+    if (settings.engine === "studio") return playStudio(freq, t, pan, level, bright, decayMul);
     const out = actx.createGain();
     const tone = actx.createBiquadFilter();
     tone.type = "lowpass";
@@ -383,13 +412,60 @@
     out.gain.exponentialRampToValueAtTime(Math.max(0.0002, level), t + 0.006);
     out.gain.exponentialRampToValueAtTime(0.0001, t + decay);
   }
+  // Studio voices: two oscillators a few cents apart for width, a soft attack, and a natural exponential tail.
+  function playStudio(freq, t, pan, level, bright, decayMul) {
+    const out = actx.createGain();
+    const tone = actx.createBiquadFilter();
+    tone.type = "lowpass";
+    tone.frequency.value = Math.min(16000, 400 + freq * (2 + bright * 9));
+    out.connect(tone);
+    const p = actx.createStereoPanner ? actx.createStereoPanner() : null;
+    if (p) { p.pan.value = pan; tone.connect(p); p.connect(master); } else tone.connect(master);
+    const cents = c => Math.pow(2, c / 1200);
+    const oscs = [];
+    const osc = (type, f, gain, dest) => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type; o.frequency.value = f; g.gain.value = gain;
+      o.connect(g); g.connect(dest || out); oscs.push(o);
+      return g;
+    };
+    let decay, attack;
+    if (settings.voice === "glass") {
+      decay = 1.8 * decayMul; attack = 0.004;
+      osc("sine", freq * cents(-4), 0.5); osc("sine", freq * cents(4), 0.5);
+      osc("sine", freq * 2.001, 0.1 + bright * 0.18);
+      // A faint bell partial that fades faster than the body of the note.
+      const shimmer = osc("sine", freq * 3.007, 0.06 * bright);
+      shimmer.gain.setTargetAtTime(0.0001, t + attack, 0.12);
+    } else if (settings.voice === "reed") {
+      decay = 0.95 * decayMul; attack = 0.016;
+      const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.Q.value = 0.8;
+      lp.frequency.setValueAtTime(freq * 1.5, t);
+      lp.frequency.linearRampToValueAtTime(freq * (2.5 + bright * 5), t + 0.06);
+      lp.frequency.setTargetAtTime(freq * 2, t + 0.06, 0.25);
+      lp.connect(out);
+      osc("sawtooth", freq * cents(-6), 0.32, lp); osc("sawtooth", freq * cents(6), 0.32, lp);
+      osc("square", freq * 0.5, 0.08, lp);
+    } else {
+      decay = 0.75 * decayMul; attack = 0.002;
+      const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.Q.value = 5;
+      lp.frequency.setValueAtTime(Math.min(12000, freq * (5 + bright * 10)), t);
+      lp.frequency.setTargetAtTime(Math.max(120, freq * 1.1), t, 0.06);
+      lp.connect(out);
+      osc("sawtooth", freq * cents(-3), 0.4, lp); osc("sawtooth", freq * cents(3), 0.4, lp);
+    }
+    out.gain.setValueAtTime(0, t);
+    out.gain.linearRampToValueAtTime(Math.max(0.0002, level), t + attack);
+    out.gain.setTargetAtTime(0.0001, t + attack, decay / 4.5);
+    oscs.forEach(o => { o.start(t); o.stop(t + attack + decay * 1.2); });
+  }
   function playBass(freq, t, dur) {
     const out = actx.createGain();
     const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420;
     const o = actx.createOscillator(); o.type = "sine"; o.frequency.value = freq;
     const o2 = actx.createOscillator(); o2.type = "triangle"; o2.frequency.value = freq;
     const g2 = actx.createGain(); g2.gain.value = 0.35;
-    o.connect(out); o2.connect(g2); g2.connect(out); out.connect(lp); lp.connect(comp);
+    o.connect(out); o2.connect(g2); g2.connect(out); out.connect(lp); lp.connect(limiter);
     out.gain.setValueAtTime(0.0001, t);
     out.gain.exponentialRampToValueAtTime(Math.max(0.0002, 0.14 * (settings.volume / 100) ** 1.5), t + 0.12);
     out.gain.setTargetAtTime(0.0001, t + dur * 0.8, dur * 0.06);
@@ -399,10 +475,7 @@
   const ageAlpha = a => a === 0 ? 1 : a < 3 ? 0.86 : a < 6 ? 0.7 : 0.56;
   function voicing(i) {
     const a = age[i];
-    if (a === 0) return { vel: 1, bright: 1, alpha: 1 };
-    if (a < 3) return { vel: 0.78, bright: 0.65, alpha: 0.86 };
-    if (a < 6) return { vel: 0.6, bright: 0.4, alpha: 0.7 };
-    return { vel: 0.48, bright: 0.22, alpha: 0.56 };
+    return { vel: OrvyCore.ageLevel(a), bright: a === 0 ? 1 : a < 3 ? 0.65 : a < 6 ? 0.4 : 0.22 };
   }
 
   // ---------- Transport ----------
@@ -432,10 +505,7 @@
         if (low >= 0 && settings.volume > 0) playBass(mtof(midiForRow(low) - 12), t, stepDur() * COLS);
       }
     }
-    const cands = [];
-    for (let r = 0; r < ROWS; r++) { const i = idx(s, r); if (grid[i]) cands.push(i); }
-    cands.sort((a, b) => (age[a] - age[b]) || (doomed[b] - doomed[a]));
-    const chosen = cands.slice(0, MAX_VOICES);
+    const chosen = OrvyCore.chooseVoices(grid, age, doomed, COLS, s, OrvyCore.MAX_VOICES);
     const level = 0.24 / Math.sqrt(Math.max(1, chosen.length));
     chosen.forEach(i => {
       const v = voicing(i);
@@ -449,7 +519,7 @@
     const ahead = document.hidden ? 1.2 : 0.1;
     if (nextTime < actx.currentTime - 0.05) nextTime = actx.currentTime + 0.03;
     while (nextTime < actx.currentTime + ahead) {
-      scheduleStep(step, nextTime);
+      scheduleStep(step, nextTime + swingDelay(step));
       nextTime += stepDur();
       step = (step + 1) % COLS;
       if (step === 0) bar++;
@@ -805,9 +875,11 @@
   }
   function syncControls() {
     tempoField.refresh(); volumeField.refresh();
+    swingField.refresh();
     $("reseed").checked = settings.reseed; $("bass").checked = settings.bass;
-    $("scale").value = settings.scale; $("voice").value = settings.voice;
-    $("soundVal").textContent = `${$("scale").selectedOptions[0]?.text || ""}, ${($("voice").selectedOptions[0]?.text || "").toLowerCase()}`;
+    $("scale").value = settings.scale; $("voice").value = settings.voice; $("key").value = String(settings.key);
+    $("soundVal").textContent = `${OrvyCore.KEY_NAMES[settings.key]} ${$("scale").selectedOptions[0]?.text || ""}, ${($("voice").selectedOptions[0]?.text || "").toLowerCase()}`;
+    document.querySelectorAll("#engine button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === settings.engine)));
     $("gridVal").textContent = `${COLS} steps`;
     document.querySelectorAll("#evolve button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.v === settings.evolveEvery)));
     document.querySelectorAll("#steps button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.v === COLS)));
@@ -866,6 +938,10 @@
     min: () => 0, max: () => 100, get: () => settings.volume, pxPerStep: 2,
     set: v => { settings.volume = v; applyAudioSettings(); save(); },
   });
+  const swingField = dragField($("swing"), {
+    min: () => 0, max: () => OrvyCore.MAX_SWING, get: () => settings.swing, pxPerStep: 3,
+    set: v => { settings.swing = v; save(); },
+  });
   const histField = dragField($("scrub"), {
     min: () => 1, max: () => Math.max(1, history.length), get: () => cursor + 1, pxPerStep: 6,
     set: v => goTo(v - 1),
@@ -911,8 +987,9 @@
   function chooseMood(id) {
     $("moods").hidden = true;
     if (id && MOODS[id]) {
-      Object.assign(settings, MOODS[id]);
-      syncControls(); buildBg(); save();
+      Object.assign(settings, MOODS[id].sound);
+      syncControls(); applyAudioSettings(); buildBg();
+      seed(MOODS[id].scene, { silent: true });
       requestRender();
       togglePlay();
     }
@@ -948,6 +1025,8 @@
   $("bass").addEventListener("change", e => { settings.bass = e.target.checked; save(); });
   $("scale").addEventListener("change", e => { settings.scale = e.target.value; syncControls(); buildBg(); requestRender(); save(); });
   $("voice").addEventListener("change", e => { settings.voice = e.target.value; syncControls(); save(); });
+  $("key").addEventListener("change", e => { settings.key = +e.target.value; syncControls(); buildBg(); requestRender(); save(); });
+  document.querySelectorAll("#engine button").forEach(b => b.addEventListener("click", () => { settings.engine = b.dataset.v; applyEngine(); syncControls(); save(); }));
   document.querySelectorAll("#evolve button").forEach(b => b.addEventListener("click", () => { settings.evolveEvery = +b.dataset.v; syncControls(); save(); }));
   document.querySelectorAll("#steps button").forEach(b => b.addEventListener("click", () => changeLength(+b.dataset.v)));
   $("back").addEventListener("click", back);
@@ -1220,23 +1299,17 @@
     if (!initAudio()) return;
     if (!playing) await togglePlay();
     const dest = actx.createMediaStreamDestination();
-    comp.connect(dest);
+    clipper.connect(dest);
     const type = recordingType();
     try { recorder = new MediaRecorder(dest.stream, type ? { mimeType: type } : undefined); }
-    catch (e) { comp.disconnect(dest); toast("Recording isn't available in this browser"); return; }
+    catch (e) { clipper.disconnect(dest); toast("Recording isn't available in this browser"); return; }
     recordChunks = [];
     recorder.ondataavailable = e => { if (e.data.size) recordChunks.push(e.data); };
     recorder.onstop = () => {
-      comp.disconnect(dest);
+      clipper.disconnect(dest);
       const blob = new Blob(recordChunks, { type: recorder.mimeType || type || "audio/webm" });
       const ext = /mp4/.test(blob.type) ? "m4a" : /ogg/.test(blob.type) ? "ogg" : "webm";
-      const d = new Date(), two = n => String(n).padStart(2, "0");
-      const stamp = `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}-${two(d.getHours())}${two(d.getMinutes())}`;
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `orvy-${stamp}.${ext}`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      saveFile(blob, `orvy-${fileStamp()}.${ext}`);
       recorder = null;
       clearInterval(recordTicker);
       $("record").setAttribute("aria-pressed", "false");
@@ -1255,6 +1328,42 @@
     recordTicker = setInterval(tick, 500);
   }
   function stopRecording() { if (recorder && recorder.state !== "inactive") recorder.stop(); }
+
+  const fileStamp = () => {
+    const d = new Date(), two = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}-${two(d.getHours())}${two(d.getMinutes())}`;
+  };
+  function saveFile(blob, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  }
+
+  // MIDI export: the next eight bars from the current grid, with this tempo, key, swing and evolution.
+  const MIDI_BARS = 8;
+  function setupMidi() {
+    $("midi").hidden = false;
+    $("midi").addEventListener("click", () => {
+      const bytes = OrvyCore.renderMidi(grid, age, COLS, settings, MIDI_BARS);
+      saveFile(new Blob([bytes], { type: "audio/midi" }), `orvy-${fileStamp()}.mid`);
+      toast(`MIDI saved, ${MIDI_BARS} bars`);
+    });
+  }
+
+  // Optional error reports: set ERROR_ENDPOINT when building to receive uncaught errors as small JSON posts.
+  const ERROR_ENDPOINT = "{{ERROR_ENDPOINT}}";
+  function setupErrorReports() {
+    if (!ERROR_ENDPOINT || !navigator.sendBeacon) return;
+    let sent = 0;
+    const report = (message, where) => {
+      if (sent++ >= 5) return;
+      navigator.sendBeacon(ERROR_ENDPOINT, JSON.stringify({ message: String(message).slice(0, 500), where: String(where || "").slice(0, 200), page: location.pathname, agent: navigator.userAgent }));
+    };
+    window.addEventListener("error", e => report(e.message, `${e.filename}:${e.lineno}:${e.colno}`));
+    window.addEventListener("unhandledrejection", e => report(e.reason?.message || e.reason, "promise"));
+  }
 
   function registerOffline() {
     if (TARGET !== "site" || !("serviceWorker" in navigator)) return;
@@ -1302,7 +1411,7 @@
   function start() {
     if (!AudioCtor) notice("This browser can't play sound. You can still draw and step through generations.");
     else if (!storageWorks()) notice("Saving is off in this browser mode, so your work won't be kept after you close the page.");
-    if (TARGET === "site") { setupRecording(); registerOffline(); }
+    if (TARGET === "site") { setupRecording(); setupMidi(); setupErrorReports(); registerOffline(); }
     const stored = store.get(KEYS.state);
     const restored = load(stored);
     syncControls();

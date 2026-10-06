@@ -10,6 +10,8 @@ Runs the tests, then writes two targets:
 Minifies with rjsmin and rcssmin when installed (pip install -r requirements-dev.txt); otherwise bundles unminified.
 """
 import base64
+import datetime
+import html as htmllib
 import hashlib
 import json
 import os
@@ -29,6 +31,13 @@ SITE_URL = os.environ.get("SITE_URL", "")
 if SITE_URL and not SITE_URL.endswith("/"):
     SITE_URL += "/"
 THEME = "#0a0614"
+# Optional, all off unless set in the environment when building (the deploy workflow passes repository variables):
+#   GOATCOUNTER     GoatCounter site code for privacy-friendly visit counts, e.g. "orvy"
+#   CONTACT         an email address or URL shown as a feedback link in the help page
+#   ERROR_ENDPOINT  a URL that receives uncaught errors from the self-hosted site as small JSON posts
+GOATCOUNTER = os.environ.get("GOATCOUNTER", "").strip()
+CONTACT = os.environ.get("CONTACT", "").strip()
+ERROR_ENDPOINT = os.environ.get("ERROR_ENDPOINT", "").strip()
 FONTS = [
     ("Chakra Petch", 400, "chakra-petch-400.woff2"),
     ("Chakra Petch", 600, "chakra-petch-600.woff2"),
@@ -69,7 +78,7 @@ def safe_minify_js(js):
     out = minify_js(js)
     broken = [t for t in re.findall(r"`[^`]*`", js) if t not in out]
     if broken:
-        print(f"minifier altered {len(broken)} template string(s), e.g. {broken[0][:60]!r}; shipping unminified")
+        print(f"minifier altered {len(broken)} template string(s), e.g. {broken[0][:60]!r} (a backtick in a comment?); shipping unminified")
         return js
     err = check_syntax(out)
     if err:
@@ -98,14 +107,26 @@ def render(target):
         js, n = re.subn(r"\n[ \t]*// @site-only.*?// @end-site-only\n", "\n", js, flags=re.S)
         if n != 1:
             sys.exit("expected one @site-only block in app.js")
-        js = js.replace('if (TARGET === "site") { setupRecording(); registerOffline(); }', "")
+        js, n = re.subn(r'if \(TARGET === "site"\) \{[^}]*\}', "", js)
+        if n != 1:
+            sys.exit("expected one site-only setup call in app.js")
+    js = js.replace("{{ERROR_ENDPOINT}}", ERROR_ENDPOINT.replace('"', "%22") if target == "site" else "")
     css = font_faces(inline=target == "embed") + minify_css(
         "\n".join(p.read_text(encoding="utf-8") for p in sorted((src / "styles").glob("*.css"))))
     html = (src / "index.html").read_text(encoding="utf-8")
+    # Markup between @site-only markers ships only in the self-hosted build. Other comments never ship.
+    if target == "embed":
+        html = re.sub(r"<!-- @site-only -->.*?<!-- @end-site-only -->", "", html, flags=re.S)
+    html = re.sub(r"<!--.*?-->", "", html, flags=re.S)
     # Collapse markup whitespace to single spaces (keeps spacing between inline elements).
     html = re.sub(r"\s+", " ", html).replace("> <", "><").strip()
     html = re.sub(r"(</(?:kbd|b|button)>)<", r"\1 <", html)
     head = ""
+    contact = ""
+    if CONTACT:
+        href = CONTACT if re.match(r"^https?://", CONTACT) else "mailto:" + CONTACT
+        label = re.sub(r"^https?://", "", CONTACT).rstrip("/")
+        contact = f'<p>Questions or feedback: <a class="linkbtn" href="{htmllib.escape(href)}">{htmllib.escape(label)}</a></p>'
     if target == "site":
         image = (SITE_URL + "og.png") if SITE_URL else "og.png"
         head = (f'<meta name="description" content="{DESCRIPTION}">'
@@ -117,8 +138,16 @@ def render(target):
                 f'<meta property="og:type" content="website"><meta property="og:title" content="{NAME}">'
                 f'<meta property="og:description" content="{DESCRIPTION}"><meta property="og:image" content="{image}">'
                 + (f'<meta property="og:url" content="{SITE_URL}">' if SITE_URL else "")
-                + '<meta name="twitter:card" content="summary_large_image">')
-    return (html.replace("{{NAME}}", NAME).replace("{{HEAD}}", head)
+                + '<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'
+                + f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{image}">'
+                + '<script type="application/ld+json">' + json.dumps({
+                    "@context": "https://schema.org", "@type": "WebApplication", "name": NAME, "description": DESCRIPTION,
+                    **({"url": SITE_URL} if SITE_URL else {}), "applicationCategory": "MusicApplication",
+                    "operatingSystem": "Any", "browserRequirements": "Requires a browser with Web Audio",
+                    "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+                }) + "</script>"
+                + (f'<script data-goatcounter="https://{GOATCOUNTER}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>' if GOATCOUNTER else ""))
+    return (html.replace("{{NAME}}", NAME).replace("{{HEAD}}", head).replace("{{CONTACT_LINE}}", contact)
                 .replace("{{STYLES}}", css).replace("{{SCRIPT}}", safe_minify_js(js)))
 
 
@@ -174,6 +203,11 @@ def main():
     digest = hashlib.sha256(b"".join((site / f).read_bytes() for f in files[1:])).hexdigest()[:12]
     (site / "sw.js").write_text((src / "sw.js").read_text(encoding="utf-8")
                                 .replace("{{CACHE}}", f"orvy-{digest}").replace("{{FILES}}", json.dumps(files)), encoding="utf-8")
+    if SITE_URL:
+        (site / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}sitemap.xml\n", encoding="utf-8")
+        (site / "sitemap.xml").write_text(
+            '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            f"<url><loc>{SITE_URL}</loc><lastmod>{datetime.date.today().isoformat()}</lastmod></url></urlset>\n", encoding="utf-8")
     count = sum(1 for p in site.rglob("*") if p.is_file())
     total = sum(p.stat().st_size for p in site.rglob("*") if p.is_file())
     print(f"dist/site/           {total:,} bytes in {count} files")
