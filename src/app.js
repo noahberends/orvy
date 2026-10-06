@@ -1334,7 +1334,9 @@
       applyDecoded(linked, "load");
       toast("Linked pattern loaded", before);
     } else if (!stored) showMoods();
-    new ResizeObserver(resize).observe($("board"));
+    // Resizing the canvas changes the board's size, so defer a frame to avoid a ResizeObserver loop.
+    let resizeFrame = 0;
+    new ResizeObserver(() => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(resize); }).observe($("board"));
     // Canvas labels use the web font; redraw them once it has loaded.
     document.fonts?.ready.then(() => { buildBg(); requestRender(); });
   }
