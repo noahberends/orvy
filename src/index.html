@@ -1,0 +1,237 @@
+<title>{{NAME}}</title>
+{{HEAD}}
+<style>{{STYLES}}</style>
+
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 30 30" aria-hidden="true">
+        <rect x="12" y="3" width="6" height="6" rx="1.6"/><rect x="21" y="12" width="6" height="6" rx="1.6"/>
+        <rect x="3" y="21" width="6" height="6" rx="1.6"/><rect x="12" y="21" width="6" height="6" rx="1.6"/><rect x="21" y="21" width="6" height="6" rx="1.6"/>
+      </svg>
+      <span class="wordmark">{{NAME}}</span>
+    </div>
+    <button class="iconbtn" type="button" data-help aria-label="Help and shortcuts" title="Help and shortcuts">
+      <svg class="i" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M7.8 7.6a2.3 2.3 0 1 1 3.1 2.2c-.6.2-.9.7-.9 1.3v.4"/><path d="M10 14.2v.1"/></svg>
+    </button>
+  </header>
+  <div class="notice" id="notice" role="status" hidden><span id="noticeText"></span><button class="btn sm" type="button" id="noticeClose">Dismiss</button></div>
+
+  <div class="main">
+    <section class="stage" aria-label="Sequencer">
+      <div class="board" id="board">
+        <canvas id="grid" tabindex="0" role="application" aria-roledescription="sequencer grid" aria-label="Steps by notes. Arrow keys move, Enter toggles a cell." aria-describedby="hintKeys"></canvas>
+        <div class="readout">
+          <span class="status" id="status" data-kind="evolving">Evolving</span>
+          <span class="nums"><span>Gen <b id="gen">0</b></span><span><b id="pop">0</b> lit</span></span>
+          <canvas id="spark" title="Lit cells since your last edit" aria-hidden="true"></canvas>
+        </div>
+
+        <div class="moods" id="moods" hidden>
+          <div class="moods-card" role="dialog" aria-labelledby="moodsTitle">
+            <p class="moods-title" id="moodsTitle">Choose a starting sound</p>
+            <div class="moods-grid">
+              <button type="button" class="mood" data-mood="bright"><b>Bright</b><span>Major pentatonic, glass</span></button>
+              <button type="button" class="mood" data-mood="mellow"><b>Mellow</b><span>Dorian, reed</span></button>
+              <button type="button" class="mood" data-mood="sharp"><b>Sharp</b><span>Hirajoshi, pluck</span></button>
+              <button type="button" class="mood" data-mood="hazy"><b>Hazy</b><span>Whole tone, glass</span></button>
+            </div>
+            <button type="button" class="linkbtn" id="moodSkip">Skip</button>
+          </div>
+        </div>
+
+        <div class="coach" id="coach" hidden>
+          <p>Brighter cells are newer and play louder. Dim ones are older and softer. A flickering cell goes out next generation.</p>
+          <button type="button" class="btn sm" id="coachOk">Got it</button>
+        </div>
+      </div>
+      <p class="hint" id="hintKeys"><kbd>Space</kbd> plays and pauses. <kbd>Ctrl Z</kbd> undoes. <button type="button" class="linkbtn" data-help>All shortcuts</button></p>
+      <p class="hint" id="hintTouch" hidden>Tap to toggle a cell. Hold, then drag to paint.</p>
+    </section>
+
+    <aside class="console" id="console" aria-label="Controls">
+      <div class="sheet-head"><span>Controls</span><button class="btn sm" type="button" id="sheetDone">Done</button></div>
+
+      <div class="section transport">
+        <button id="play" type="button" aria-pressed="false">
+          <svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path class="playIcon" d="M6 4l10 6-10 6z"/></svg><span class="playLabel">Play</span>
+        </button>
+        <div class="dragrow">
+          <div class="dragnum" title="Tempo. Drag sideways or type a number.">
+            <svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 3h5l3 14h-11z"/><path d="M10 13l4-7"/></svg>
+            <input id="tempo" type="text" inputmode="numeric" role="spinbutton" aria-label="Tempo, beats per minute" autocomplete="off">
+            <span class="unit">bpm</span>
+          </div>
+          <div class="dragnum" title="Volume. Drag sideways or type a number.">
+            <svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3.5v11L6 12H3z"/><path d="M13.5 7.5a3.5 3.5 0 0 1 0 5"/><path d="M15.5 5a7 7 0 0 1 0 10"/></svg>
+            <input id="volume" type="text" inputmode="numeric" role="spinbutton" aria-label="Volume, percent" autocomplete="off">
+            <span class="unit">%</span>
+          </div>
+        </div>
+      </div>
+
+      <details class="section" data-sec="patterns" open>
+        <summary><span class="label">Patterns</span></summary>
+        <div class="section-body">
+          <div class="stamps" id="stamps" role="group" aria-label="Stamps">
+            <button type="button" data-stamp="glider" aria-pressed="false" aria-label="Glider stamp" title="Glider"><canvas></canvas></button>
+            <button type="button" data-stamp="lwss" aria-pressed="false" aria-label="Spaceship stamp" title="Spaceship"><canvas></canvas></button>
+            <button type="button" data-stamp="rpent" aria-pressed="false" aria-label="R-pentomino stamp" title="R-pentomino"><canvas></canvas></button>
+            <button type="button" data-stamp="blinker" aria-pressed="false" aria-label="Blinker stamp" title="Blinker"><canvas></canvas></button>
+            <button type="button" data-stamp="toad" aria-pressed="false" aria-label="Toad stamp" title="Toad"><canvas></canvas></button>
+            <button type="button" data-stamp="beacon" aria-pressed="false" aria-label="Beacon stamp" title="Beacon"><canvas></canvas></button>
+          </div>
+          <div class="strip" role="group" aria-label="Start over">
+            <button type="button" data-seed="gliders">Gliders</button>
+            <button type="button" data-seed="osc">Oscillators</button>
+            <button type="button" data-seed="random">Random</button>
+            <button type="button" data-seed="clear" class="danger">Clear</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="section" data-sec="sound">
+        <summary><span class="label">Sound</span><span class="val" id="soundVal"></span></summary>
+        <div class="section-body">
+          <select id="scale" aria-label="Scale">
+            <option value="majpent">Major pentatonic</option>
+            <option value="minpent">Minor pentatonic</option>
+            <option value="dorian">Dorian</option>
+            <option value="hirajoshi">Hirajoshi</option>
+            <option value="whole">Whole tone</option>
+          </select>
+          <select id="voice" aria-label="Voice">
+            <option value="glass">Glass</option>
+            <option value="reed">Reed</option>
+            <option value="pluck">Pluck</option>
+          </select>
+          <label class="check" title="Plays an octave below the lowest lit cell, once per bar"><input type="checkbox" id="bass"> Bass</label>
+        </div>
+      </details>
+
+      <details class="section" data-sec="grid">
+        <summary><span class="label">Grid</span><span class="val" id="gridVal"></span></summary>
+        <div class="section-body">
+          <div class="field">
+            <span class="flabel" id="evolveLabel">Evolve</span>
+            <div class="strip" role="group" aria-labelledby="evolveLabel" id="evolve">
+              <button type="button" data-v="1">1 bar</button>
+              <button type="button" data-v="2">2 bars</button>
+              <button type="button" data-v="4">4 bars</button>
+              <button type="button" data-v="0">Freeze</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="flabel" id="stepsLabel">Steps</span>
+            <div class="strip" role="group" aria-labelledby="stepsLabel" id="steps">
+              <button type="button" data-v="12">12</button>
+              <button type="button" data-v="16">16</button>
+              <button type="button" data-v="24">24</button>
+            </div>
+          </div>
+          <label class="check" title="When the grid empties or repeats for several generations, start a random one"><input type="checkbox" id="reseed"> Auto-reseed</label>
+        </div>
+      </details>
+
+      <details class="section" data-sec="history">
+        <summary><span class="label">History</span><span class="val" id="histVal"></span></summary>
+        <div class="section-body">
+          <div class="histrow">
+            <div class="dragnum" title="Drag sideways to scrub through history">
+              <span class="unit">Step</span>
+              <input id="scrub" type="text" inputmode="numeric" role="spinbutton" aria-label="History step" autocomplete="off">
+              <span class="unit" id="histTotal">of 1</span>
+            </div>
+            <div class="strip icons" role="group" aria-label="Step through history">
+              <button type="button" id="back" aria-label="Back one step" title="Back">
+                <svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5L3.5 9.5 8 14"/><path d="M4 9.5h7.5a4.5 4.5 0 0 1 0 9H10"/></svg>
+              </button>
+              <button type="button" id="fwd" aria-label="Forward one step" title="Forward, or next generation">
+                <svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 5l4.5 4.5L12 14"/><path d="M16 9.5H8.5a4.5 4.5 0 0 0 0 9H10"/></svg>
+              </button>
+            </div>
+          </div>
+          <button class="btn" type="button" id="hand" title="Return to the last pattern you drew or loaded">Back to my pattern</button>
+        </div>
+      </details>
+
+      <details class="section" data-sec="tapes">
+        <summary><span class="label">Tapes</span></summary>
+        <div class="section-body">
+          <button class="btn" type="button" id="share">
+            <svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path d="M8.5 11.5a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-.9.9"/><path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l.9-.9"/></svg>Copy link
+          </button>
+          <input id="shareOut" type="text" readonly hidden aria-label="Link to this pattern">
+          <button class="btn" type="button" id="record" hidden>
+            <svg class="i" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><circle class="recDot" cx="10" cy="10" r="3.2"/></svg><span id="recordLabel">Record audio</span>
+          </button>
+          <div class="tapes" id="tapes"></div>
+        </div>
+      </details>
+    </aside>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<nav class="dock" aria-label="Transport">
+  <button type="button" id="dBack" aria-label="Back one step"><svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5L3.5 9.5 8 14"/><path d="M4 9.5h7.5a4.5 4.5 0 0 1 0 9H10"/></svg>Back</button>
+  <button type="button" id="dPlay" aria-pressed="false"><svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path class="playIcon" d="M6 4l10 6-10 6z"/></svg><span class="playLabel">Play</span></button>
+  <button type="button" id="dFwd" aria-label="Forward one step"><svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 5l4.5 4.5L12 14"/><path d="M16 9.5H8.5a4.5 4.5 0 0 0 0 9H10"/></svg>Forward</button>
+  <button type="button" id="dMore" aria-label="Open controls" aria-controls="console" aria-expanded="false"><svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M4 10h12M4 14h12"/></svg>More</button>
+</nav>
+
+<div class="stampchip" id="stampChip" hidden><span id="stampText"></span><button type="button" id="stampRot">Rotate</button><button type="button" id="stampDone">Done</button></div>
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" id="toastUndo" hidden>Undo</button></div>
+<div class="sr-only" id="sr" aria-live="polite"></div>
+
+<div class="modal" id="help" hidden>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="modal-head">
+      <h2 id="helpTitle">About {{NAME}}</h2>
+      <button class="btn sm" type="button" id="helpClose">Close</button>
+    </div>
+    <p>{{NAME}} is a step sequencer driven by Conway's Game of Life. Each lit cell plays its row's note when the playhead reaches its column. At the end of each bar the grid moves forward one generation, so the pattern and the melody change together.</p>
+
+    <h3>How cells sound</h3>
+    <ul>
+      <li>Rows are notes, lowest at the bottom. Columns are steps, panned from left to right.</li>
+      <li>New cells are brightest and loudest. Cells that have survived several generations get dimmer, softer and darker in tone.</li>
+      <li>A cell that will go out next generation flickers during playback and plays a short note.</li>
+      <li>Each step plays up to four notes, newest cells first.</li>
+      <li>With Bass on, a low note plays an octave below the lowest lit cell at the start of each bar.</li>
+    </ul>
+
+    <h3>Drawing</h3>
+    <ul>
+      <li>Click or drag to light and clear cells. On a touchscreen, tap to toggle one cell, or hold for a moment and then drag to paint.</li>
+      <li>Stamps add a pattern wherever you click, on top of what is already there. Q and E rotate the stamp, Esc puts it away.</li>
+      <li>While playing, any edit holds evolution for one bar so you hear the change first.</li>
+    </ul>
+
+    <h3>Keyboard</h3>
+    <table class="keys">
+      <tr><td><kbd>Space</kbd></td><td>Play or pause. Playback resumes where it stopped.</td></tr>
+      <tr><td><kbd>Home</kbd></td><td>Move the playhead to the first step</td></tr>
+      <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>Step back or forward through history. Forward at the newest step runs the next generation.</td></tr>
+      <tr><td><kbd>Ctrl Z</kbd> <kbd>Ctrl Shift Z</kbd></td><td>Undo and redo</td></tr>
+      <tr><td><kbd>N</kbd></td><td>Next generation</td></tr>
+      <tr><td><kbd>R</kbd> <kbd>C</kbd></td><td>Random grid, clear grid</td></tr>
+      <tr><td><kbd>Q</kbd> <kbd>E</kbd> <kbd>Esc</kbd></td><td>Rotate the stamp, put it away</td></tr>
+      <tr><td><kbd>Tab</kbd></td><td>Focus the grid, then arrow keys move and Enter toggles a cell or places the stamp</td></tr>
+    </table>
+
+    <h3>The rules</h3>
+    <p>A dark cell with exactly three lit neighbours lights up. A lit cell with two or three lit neighbours stays lit. Every other cell goes dark. This is the rule known as B3/S23. The grid wraps at its edges, so a pattern leaving the right side comes back on the left.</p>
+
+    <h3>Version 1.4</h3>
+    <dl class="changes">
+      <dt>1.4</dt><dd>New name, drag-to-set tempo and volume, grid length of 12, 16 or 24 steps, tapes for saving, a starting sound picker and this help page.</dd>
+      <dt>1.3</dt><dd>Touch painting, resume from pause, the edit hold, stamps, undo after anything that replaces the grid.</dd>
+      <dt>1.2</dt><dd>History and undo, dynamics based on cell age, bass, links to patterns, faster drawing, phone layout and keyboard control.</dd>
+      <dt>1.1</dt><dd>Neon look.</dd>
+      <dt>1.0</dt><dd>First release.</dd>
+    </dl>
+  </div>
+</div>
+
+<script>{{SCRIPT}}</script>

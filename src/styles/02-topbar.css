@@ -1,0 +1,11 @@
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.mark { width: 28px; height: 28px; display: block; }
+.mark rect { fill: none; stroke: var(--unlit); stroke-width: 1.75; transition: stroke .4s; }
+.wordmark { font-family: var(--display); font-size: 30px; line-height: 1; letter-spacing: 0.02em; color: var(--unlit); transition: color .4s, text-shadow .4s; }
+/* The sign lights while audio plays. */
+.lit .wordmark { color: #ffe3fa; text-shadow: var(--g2-pink); }
+.lit .mark rect { stroke: var(--cyan); }
+.lit .mark { filter: drop-shadow(0 0 3px #19f0ff) drop-shadow(0 0 10px rgba(25, 240, 255, 0.5)); }
+.igniting .wordmark, .igniting .mark { animation: ignite .7s both; }
+@keyframes ignite { 0% { opacity: .3; } 15% { opacity: 1; } 25% { opacity: .35; } 45% { opacity: 1; } 55% { opacity: .6; } 70%, 100% { opacity: 1; } }

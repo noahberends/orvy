@@ -1,0 +1,20 @@
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 22px; align-items: start; }
+@media (max-width: 860px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.stage { min-width: 0; display: grid; gap: 10px; align-content: start; }
+@media (min-width: 861px) and (min-height: 700px) { .stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); } }
+.board { position: relative; background: #0b0717; border: 1px solid rgba(25, 240, 255, 0.28); border-radius: 14px; padding: 14px 14px 10px; }
+#grid { display: block; max-width: 100%; margin-inline: auto; border-radius: 6px; touch-action: pan-y; cursor: crosshair; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.stamping #grid { cursor: copy; }
+.readout { display: flex; align-items: center; gap: 14px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.readout .nums { margin-left: auto; display: flex; gap: 14px; }
+/* The body font has proportional digits, so counters get a fixed slot to keep the row from shifting. */
+.readout b { color: var(--fg); font-weight: 600; display: inline-block; min-width: 3ch; text-align: right; }
+.status { font-weight: 600; color: var(--lime); }
+.status[data-kind="osc"] { color: var(--cyan); }
+.status[data-kind="still"] { color: var(--amber); }
+.status[data-kind="extinct"] { color: var(--red); }
+.status[data-kind="hold"] { color: var(--pink); }
+#spark { width: 72px; height: 18px; display: block; }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--cyan); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-size: inherit; }
+@media (max-width: 560px) { .board { padding: 8px 8px 8px; } .wordmark { font-size: 26px; } }

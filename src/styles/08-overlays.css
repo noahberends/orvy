@@ -1,0 +1,57 @@
+.scrim { position: fixed; inset: 0; z-index: 7; background: rgba(3, 1, 8, 0.6); }
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; z-index: 9; display: flex; align-items: center; gap: 12px;
+  transform: translate(-50%, 16px); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+  background: #120c22; color: var(--fg); border: 1px solid var(--plate-edge); border-radius: 8px; padding: 8px 14px;
+  font-size: 14px; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.actionable { pointer-events: auto; }
+.toast button { background: none; border: 0; padding: 0; color: var(--lime); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+.stampchip {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 8px;
+  background: #120c22; border: 1px solid var(--lime); border-radius: 8px; padding: 6px 6px 6px 14px; font-size: 14px; font-weight: 600; white-space: nowrap;
+}
+.stampchip button { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.stampchip button:hover { border-color: var(--lime); }
+.stamping .toast { bottom: 76px; }
+@media (max-width: 860px) {
+  .toast { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+  /* On phones the stamp bar sits at the top, clear of the counters and the transport keys. */
+  .stampchip { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 10px); }
+  .stamping .toast { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* First-visit sound picker, laid over the board. */
+.moods { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 16px; background: rgba(8, 5, 16, 0.88); border-radius: 14px; }
+.moods-card { display: grid; gap: 12px; justify-items: center; width: min(420px, 100%); }
+.moods-title { margin: 0; font-size: 17px; font-weight: 600; }
+.moods-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.mood { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #120c22; cursor: pointer; }
+.mood b { font-size: 15px; }
+.mood span { font-size: 12.5px; color: var(--muted); }
+.mood:hover { border-color: var(--pink); }
+
+/* One-time note shown the first time the grid plays. */
+.coach { position: absolute; left: 14px; right: 14px; bottom: 50px; z-index: 2; display: flex; gap: 12px; align-items: center; padding: 10px 12px; background: #120c22; border: 1px solid var(--amber); border-radius: 8px; }
+.coach p { margin: 0; font-size: 13.5px; }
+.coach .btn { white-space: nowrap; flex: none; }
+
+.modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(3, 1, 8, 0.72); }
+.modal-panel { width: min(640px, 100%); max-height: 86vh; overflow-y: auto; background: #140e25; border: 1px solid var(--plate-edge); border-radius: 12px; padding: 18px 22px 22px; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: -18px; background: #140e25; padding-block: 18px 8px; margin-top: -18px; }
+.modal h2 { margin: 0; font-size: 19px; }
+.modal h3 { margin: 18px 0 6px; font-size: 15px; color: var(--cyan); }
+.modal p, .modal li, .modal td, .modal dd { font-size: 14px; color: #d9d1ec; max-width: 62ch; }
+.modal ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.keys { border-collapse: collapse; width: 100%; }
+.keys td { padding: 5px 0; vertical-align: top; border-bottom: 1px solid var(--line); }
+.keys td:first-child { white-space: nowrap; padding-right: 14px; }
+.changes { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; }
+.changes dt { font-weight: 600; color: var(--muted); font-size: 14px; }
+.changes dd { margin: 0; }
+
+.notice { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--amber); border-radius: 8px; background: #160f24; font-size: 14px; }
+.notice span { flex: 1; }
